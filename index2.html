@@ -1114,6 +1114,11 @@
                     ✨ Tạo Ảnh
                 </button>
 
+                <!-- Clear All Button -->
+                <button class="btn btn-danger" onclick="clearAllImages()" id="clearAllBtn" style="width: 100%; padding: 10px; font-size: 13px; margin-bottom: 12px; background: #dc2626; border-color: #dc2626;">
+                    🗑️ Clear All Images
+                </button>
+
                 <div id="progressBar" class="progress-bar" style="display: none; margin-bottom: 12px;">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
@@ -3587,6 +3592,45 @@
             }
         }
 
+        // Clear all images
+        function clearAllImages() {
+            if (images.length === 0) {
+                alert('⚠️ Không có ảnh nào để xóa!');
+                return;
+            }
+
+            const confirmed = confirm(`🗑️ Xóa tất cả ${images.length} ảnh?\n\n⚠️ Lưu ý: Chỉ xóa trong gallery, file trên máy vẫn còn.\n\n✅ Nhấn OK để xóa\n❌ Nhấn Cancel để hủy`);
+
+            if (!confirmed) {
+                console.log('❌ User cancelled clear all');
+                return;
+            }
+
+            console.log(`🗑️ Clearing ${images.length} images from gallery...`);
+
+            // Clear images array
+            const clearedCount = images.length;
+            images = [];
+
+            // Clear gallery UI
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = `
+                <div class="empty-state">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <h3>Chưa có ảnh nào</h3>
+                    <p>Nhập mô tả ở sidebar và nhấn "Tạo Ảnh" để bắt đầu</p>
+                </div>
+            `;
+
+            // Update image count
+            updateImageCount();
+
+            console.log(`✅ Cleared ${clearedCount} images successfully!`);
+            alert(`✅ Đã xóa ${clearedCount} ảnh khỏi gallery!\n\n💡 Bạn có thể bắt đầu batch mới.`);
+        }
+
         // Modal
         function openModal(data) {
             const image = images.find(img => img.id === data.id);
@@ -5675,8 +5719,7 @@
 
         // Generate all videos
         async function generateAllVideos() {
-            console.log('🔥 [DEBUG] generateAllVideos() called!');
-            alert('DEBUG: Function generateAllVideos() được gọi!');
+            console.log('🎬 [generateAllVideos] Starting...');
 
             if (videoScenes.length === 0) {
                 alert('⚠️ No scenes to generate!');
