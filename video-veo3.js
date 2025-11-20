@@ -328,6 +328,14 @@ const VideoVeo3 = (() => {
 
       // Send operations array to match server.js format
       const res = await api.checkStatus({ operations: [{ operation: { name: opId } }] });
+
+      // Check if token expired (401 error)
+      if (!res.success && res.tokenExpired) {
+        console.error(`❌ [pollOperation] Token expired!`);
+        alert('⚠️ TOKEN ĐÃ HẾT HẠN!\n\nVui lòng:\n1. Click nút "Bắt Token" ở tab Settings\n2. Sau đó thử lại');
+        throw new Error("Token expired - please refresh");
+      }
+
       const op = res?.operations?.[0];
 
       console.log(`📡 [pollOperation] Response attempt ${i + 1}:`, {

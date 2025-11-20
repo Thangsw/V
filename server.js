@@ -86,7 +86,18 @@ function generateSessionId() {
 // AUTHENTICATION
 // ============================================
 
-const getAccessToken = async () => {
+const getAccessToken = async (forceRefresh = false) => {
+  // Return cached token if still valid (less than 55 minutes old) and not forced refresh
+  if (!forceRefresh && session.accessToken && session.lastUpdate) {
+    const tokenAge = Date.now() - session.lastUpdate;
+    const maxAge = 55 * 60 * 1000; // 55 minutes
+
+    if (tokenAge < maxAge) {
+      log(`✓ Using cached access token (age: ${Math.floor(tokenAge / 1000 / 60)}min)`);
+      return session.accessToken;
+    }
+  }
+
   log('Getting access token from Whisk session...');
 
   try {
@@ -114,6 +125,17 @@ const getAccessToken = async () => {
     }
   } catch (error) {
     log(`✗ Failed to get access token: ${error.message}`, 'error');
+
+    // If 401, cookies/session token expired
+    if (error.response?.status === 401) {
+      log('⚠️ Session expired! Please re-login and click "Bắt Token"', 'error');
+      // Clear session
+      session.accessToken = null;
+      session.cookies = null;
+      session.sessionToken = null;
+      session.lastUpdate = null;
+    }
+
     log(`Error details: ${error.stack}`, 'error');
     throw error;
   }
@@ -2019,6 +2041,18 @@ app.post('/api/veo3/check-status', async (req, res) => {
     res.json({ success: true, operations: parsedOps });
   } catch (err) {
     log(`✗ Check status failed: ${err.message}`, 'error');
+
+    // Handle 401 specifically
+    if (err.response?.status === 401) {
+      log('⚠️ Token expired! Please refresh by clicking "Bắt Token" button', 'error');
+      return res.json({
+        success: false,
+        error: 'Token đã hết hạn! Vui lòng click nút "Bắt Token" để làm mới.',
+        tokenExpired: true,
+        statusCode: 401
+      });
+    }
+
     res.json({ success: false, error: err.message });
   }
 });
@@ -2319,6 +2353,45 @@ app.post('/api/save-reference', async (req, res) => {
     });
   } catch (err) {
     log(`❌ Save reference failed: ${err.message}`, 'error');
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// Open folder in file explorer
+app.post('/api/open-folder', async (req, res) => {
+  try {
+    const { folderPath } = req.body;
+
+    if (!folderPath) {
+      return res.json({ success: false, error: 'No folder path provided' });
+    }
+
+    log(`Opening folder: ${folderPath}`);
+
+    // Determine the command based on platform
+    let command, args;
+
+    if (process.platform === 'win32') {
+      // Windows: Use explorer
+      command = 'explorer';
+      args = [folderPath.replace(/\//g, '\\')];
+    } else if (process.platform === 'darwin') {
+      // macOS: Use open
+      command = 'open';
+      args = [folderPath];
+    } else {
+      // Linux: Try xdg-open
+      command = 'xdg-open';
+      args = [folderPath];
+    }
+
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    child.unref();
+
+    log(`✓ Opened folder: ${folderPath}`);
+    res.json({ success: true, message: 'Folder opened successfully' });
+  } catch (err) {
+    log(`✗ Open folder failed: ${err.message}`, 'error');
     res.json({ success: false, error: err.message });
   }
 });

@@ -1381,6 +1381,9 @@
                             </label>
                             <div style="display: flex; gap: 6px;">
                                 <input type="text" id="outputFolderPath" placeholder="C:\Users\Work\Videos\Veo3" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; background: var(--bg-main); color: var(--text-primary);" />
+                                <button onclick="openOutputFolder()" class="btn btn-primary" style="padding: 8px 12px; font-size: 11px; white-space: nowrap;">
+                                    📂 Mở
+                                </button>
                                 <button onclick="resetOutputFolder()" class="btn btn-secondary" style="padding: 8px 12px; font-size: 11px; white-space: nowrap;">
                                     🔄 Mặc định
                                 </button>
@@ -4036,6 +4039,34 @@
             } else {
                 localStorage.removeItem('veo3_output_folder');
                 console.log('✅ Đã xóa thư mục tùy chỉnh (dùng mặc định)');
+            }
+        }
+
+        // Open output folder in file explorer
+        async function openOutputFolder() {
+            let folderPath = document.getElementById('outputFolderPath').value.trim();
+
+            // If empty, use default folder (./videos from server root)
+            if (!folderPath) {
+                folderPath = './videos';
+            }
+
+            try {
+                const response = await fetch('/api/open-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folderPath })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    console.log('✅ Đã mở thư mục:', folderPath);
+                } else {
+                    alert('❌ Không thể mở thư mục: ' + result.error);
+                }
+            } catch (err) {
+                alert('❌ Lỗi khi mở thư mục: ' + err.message);
             }
         }
 
