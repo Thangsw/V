@@ -5675,6 +5675,9 @@
 
         // Generate all videos
         async function generateAllVideos() {
+            console.log('🔥 [DEBUG] generateAllVideos() called!');
+            alert('DEBUG: Function generateAllVideos() được gọi!');
+
             if (videoScenes.length === 0) {
                 alert('⚠️ No scenes to generate!');
                 return;
