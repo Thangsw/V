@@ -1,0 +1,19 @@
+{
+  "name": "whisk-veo3-video-generator",
+  "version": "2.0.0",
+  "description": "Whisk AI Image + Veo3 Video Generation",
+  "main": "server.js",
+  "scripts": {
+    "start": "node runner.js",
+    "server": "node server.js"
+  },
+  "keywords": ["whisk", "veo3", "ai", "video", "image"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^21.0.0",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5"
+  }
+}
