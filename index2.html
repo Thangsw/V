@@ -1262,6 +1262,9 @@
                 <div class="header-actions">
                     <button class="btn btn-secondary" onclick="VideoModule.saveCurrentImages()" style="font-size: 12px; padding: 6px 12px;">💾 Lưu</button>
                     <button class="btn btn-success" onclick="VideoModule.confirmMoveToVideo()" style="font-size: 12px; padding: 6px 12px;">➡️ Chuyển sang Video</button>
+                    <div id="videoDownloadProgress" style="display: none; font-size: 11px; color: var(--primary-color); margin-left: 12px; padding: 6px 12px; background: rgba(139, 92, 246, 0.1); border-radius: 4px; border: 1px solid var(--primary-color); white-space: nowrap;">
+                        <span id="videoDownloadProgressText">📥 Đang tải: 0/0</span>
+                    </div>
                 </div>
             </header>
 
@@ -1436,6 +1439,21 @@
                             <button class="btn btn-success" onclick="generateAllVideos()" id="genAllVideosBtn" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 700;">
                                 🎬 Generate All Videos
                             </button>
+
+                            <!-- Generate Progress -->
+                            <div id="generateProgress" style="display: none; background: rgba(139, 92, 246, 0.1); padding: 12px; border-radius: 6px; border: 1px solid var(--primary-color);">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: var(--text-primary); font-size: 12px; font-weight: 600;">
+                                    <span id="generateProgressText">⏳ Đang generate: 0/0</span>
+                                    <span id="generateProgressPercent">0%</span>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden;">
+                                    <div id="generateProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary-color), #a78bfa); transition: width 0.3s ease;"></div>
+                                </div>
+                                <div id="generateProgressDetail" style="font-size: 10px; color: var(--text-secondary); margin-top: 6px;">
+                                    Đang xử lý...
+                                </div>
+                            </div>
+
                             <button class="btn btn-secondary" onclick="syncVideosFromGoogle()" id="syncVideosBtn" style="width: 100%; padding: 10px; font-size: 13px;">
                                 🔄 Sync Videos từ Google
                             </button>
@@ -3976,6 +3994,21 @@
             document.getElementById('downloadProgressPercent').textContent = `${percent}%`;
             document.getElementById('downloadProgressBar').style.width = `${percent}%`;
 
+            // Also update header progress bar
+            const headerProgress = document.getElementById('videoDownloadProgress');
+            const headerText = document.getElementById('videoDownloadProgressText');
+            if (headerProgress && headerText) {
+                headerProgress.style.display = 'inline-block';
+                headerText.textContent = `📥 Đang tải: ${current}/${total} (${percent}%)`;
+
+                // Hide when complete
+                if (current === total) {
+                    setTimeout(() => {
+                        headerProgress.style.display = 'none';
+                    }, 3000); // Hide after 3 seconds
+                }
+            }
+
             // Update or add file to list (single line per file)
             if (fileName) {
                 const fileList = document.getElementById('downloadFileList');
@@ -5690,6 +5723,17 @@
             const originalText = btn.textContent;
             btn.disabled = true;
 
+            // Show progress bar
+            const progressDiv = document.getElementById('generateProgress');
+            const progressText = document.getElementById('generateProgressText');
+            const progressPercent = document.getElementById('generateProgressPercent');
+            const progressBar = document.getElementById('generateProgressBar');
+            const progressDetail = document.getElementById('generateProgressDetail');
+
+            if (progressDiv) {
+                progressDiv.style.display = 'block';
+            }
+
             let successCount = 0;
             let errorCount = 0;
             let skippedCount = 0;
@@ -5730,9 +5774,23 @@
             const totalScenes = extendScenes.length + normalScenes.length;
             let completedScenes = 0;
 
-            // Helper to update button text
-            const updateProgress = () => {
+            // Helper to update button text and progress bar
+            const updateProgress = (detail = '') => {
                 btn.textContent = `⏳ Generating ${completedScenes}/${totalScenes}...`;
+
+                // Update progress bar
+                if (progressText) progressText.textContent = `⏳ Đang generate: ${completedScenes}/${totalScenes}`;
+                if (progressPercent) {
+                    const percent = totalScenes > 0 ? Math.round((completedScenes / totalScenes) * 100) : 0;
+                    progressPercent.textContent = `${percent}%`;
+                }
+                if (progressBar) {
+                    const percent = totalScenes > 0 ? (completedScenes / totalScenes) * 100 : 0;
+                    progressBar.style.width = `${percent}%`;
+                }
+                if (progressDetail && detail) {
+                    progressDetail.textContent = detail;
+                }
             };
 
             // Process normal scenes with 2 concurrent threads (reduced to avoid rate limit)
@@ -5803,6 +5861,11 @@
 
             btn.disabled = false;
             btn.textContent = originalText;
+
+            // Hide progress bar
+            if (progressDiv) {
+                progressDiv.style.display = 'none';
+            }
 
             let message = `✅ Generation complete!\n\n`;
             if (successCount > 0) message += `✓ Success: ${successCount}\n`;

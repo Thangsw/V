@@ -47,6 +47,9 @@ const VideoVeo3 = (() => {
   async function postJson(url, body) {
     console.log(`📡 [API] POST ${url}`);
 
+    // Check if this is a batch log call (non-critical analytics)
+    const isBatchLog = url.includes('/submit-batch-log');
+
     // Truncate body to prevent stack overflow when logging large base64 images
     const bodyStr = JSON.stringify(body ?? {});
     if (bodyStr.length > 200) {
@@ -65,6 +68,14 @@ const VideoVeo3 = (() => {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+
+      // For batch logs, just log warning and return error instead of throwing
+      if (isBatchLog) {
+        console.warn(`⚠️ [API] Batch log failed (non-critical): ${res.status}`);
+        return { success: false, error: `${res.status} ${text}` };
+      }
+
+      // For critical APIs, throw error
       console.error(`❌ [API] ${url} failed: ${res.status} ${text}`);
       throw new Error(`API ${url} failed: ${res.status} ${text}`);
     }
