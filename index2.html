@@ -1436,6 +1436,9 @@
                             <button class="btn btn-success" onclick="generateAllVideos()" id="genAllVideosBtn" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 700;">
                                 🎬 Generate All Videos
                             </button>
+                            <button class="btn btn-secondary" onclick="syncVideosFromGoogle()" id="syncVideosBtn" style="width: 100%; padding: 10px; font-size: 13px;">
+                                🔄 Sync Videos từ Google
+                            </button>
                             <button class="btn btn-primary" onclick="downloadAllVideos()" id="downloadAllVideosBtn" style="width: 100%; padding: 10px; font-size: 13px;" disabled>
                                 💾 Download All Selected
                             </button>
@@ -5710,6 +5713,13 @@
                     return;
                 }
 
+                // Skip scenes that already have videos (status=done and has videos)
+                if (scene.status === 'done' && scene.videos && scene.videos.length > 0) {
+                    console.log(`✓ Skipping scene ${idx + 1}: already has ${scene.videos.length} video(s)`);
+                    skippedCount++;
+                    return;
+                }
+
                 if (scene.previousVideoMediaId) {
                     extendScenes.push(idx);
                 } else {
@@ -5725,9 +5735,9 @@
                 btn.textContent = `⏳ Generating ${completedScenes}/${totalScenes}...`;
             };
 
-            // Process normal scenes with 5 concurrent threads
+            // Process normal scenes with 2 concurrent threads (reduced to avoid rate limit)
             if (normalScenes.length > 0) {
-                console.log(`🎬 Processing ${normalScenes.length} normal scenes with 5 parallel threads`);
+                console.log(`🎬 Processing ${normalScenes.length} normal scenes with 2 parallel threads (to avoid rate limit)`);
                 updateProgress();
 
                 const processScene = async (sceneIdx) => {
@@ -5749,10 +5759,16 @@
                     }
                 };
 
-                // Process in batches of 5
-                for (let i = 0; i < normalScenes.length; i += 5) {
-                    const batch = normalScenes.slice(i, i + 5);
+                // Process in batches of 2 (reduced from 5 to avoid HIGH_TRAFFIC error)
+                for (let i = 0; i < normalScenes.length; i += 2) {
+                    const batch = normalScenes.slice(i, i + 2);
                     await Promise.all(batch.map(sceneIdx => processScene(sceneIdx)));
+
+                    // Add 2 second delay between batches to avoid rate limit
+                    if (i + 2 < normalScenes.length) {
+                        console.log('⏸️ Waiting 2s before next batch (rate limit protection)...');
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
                 }
             }
 
@@ -5780,8 +5796,8 @@
                         updateProgress();
                     }
 
-                    // Small delay between extend scenes
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // Delay between extend scenes (increased to avoid rate limit)
+                    await new Promise(resolve => setTimeout(resolve, 1500));
                 }
             }
 
@@ -5795,6 +5811,102 @@
 
             alert(message);
             renderVideoScenes();
+        }
+
+        // Sync videos from Google project
+        async function syncVideosFromGoogle() {
+            if (!currentProjectId) {
+                alert('⚠️ Please setup Project ID first!');
+                return;
+            }
+
+            const btn = document.getElementById('syncVideosBtn');
+            if (!btn) return;
+
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Syncing...';
+
+            try {
+                console.log('🔄 Syncing videos from Google project:', currentProjectId);
+
+                // Get project data from Google
+                const response = await fetch('/api/veo3/get-project', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectId: currentProjectId })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    if (result.tokenExpired) {
+                        alert('⚠️ TOKEN ĐÃ HẾT HẠN!\n\nVui lòng:\n1. Click nút "Bắt Token" ở tab Settings\n2. Sau đó thử lại');
+                    } else {
+                        throw new Error(result.error || 'Failed to get project data');
+                    }
+                    return;
+                }
+
+                const projectData = result.project;
+                console.log('✅ Project data:', projectData);
+
+                // Parse scenes and clips
+                if (!projectData.scenes || projectData.scenes.length === 0) {
+                    alert('ℹ️ Project không có scene nào. Hãy tạo video trước.');
+                    return;
+                }
+
+                let syncedCount = 0;
+                let newVideoCount = 0;
+
+                // Process each scene
+                projectData.scenes.forEach((googleScene, sceneIdx) => {
+                    if (!googleScene.clips || googleScene.clips.length === 0) {
+                        return; // Skip empty scenes
+                    }
+
+                    // Find matching scene in videoScenes (by index or sceneId)
+                    let localScene = videoScenes[sceneIdx];
+
+                    if (!localScene) {
+                        console.log(`⚠️ Scene ${sceneIdx} not found in local data, skipping`);
+                        return;
+                    }
+
+                    // Extract videos from clips
+                    const videos = [];
+                    googleScene.clips.forEach(clip => {
+                        if (clip.video && clip.video.fifeUrl) {
+                            videos.push({
+                                url: clip.video.fifeUrl,
+                                mediaId: clip.video.mediaGenerationId,
+                                seed: clip.video.seed
+                            });
+                            newVideoCount++;
+                        }
+                    });
+
+                    if (videos.length > 0) {
+                        localScene.videos = videos;
+                        localScene.status = 'done';
+                        localScene.error = null;
+                        syncedCount++;
+                        console.log(`✅ Scene ${sceneIdx + 1}: Synced ${videos.length} videos`);
+                    }
+                });
+
+                renderVideoScenes();
+
+                alert(`✅ Sync thành công!\n\n📊 Tổng kết:\n- ${syncedCount} scenes có video\n- ${newVideoCount} videos được sync`);
+
+            } catch (err) {
+                console.error('❌ Sync failed:', err);
+                alert('❌ Lỗi khi sync: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
         }
 
         // Download ALL videos (not just selected)

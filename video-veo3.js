@@ -357,8 +357,20 @@ const VideoVeo3 = (() => {
 
       // Check for FAILED status
       if (op.status === "FAILED" || op.status === "MEDIA_GENERATION_STATUS_FAILED") {
+        const errorMsg = op.operation?.error?.message || '';
+
+        // Check if it's a HIGH_TRAFFIC error (can retry)
+        if (errorMsg.includes('HIGH_TRAFFIC')) {
+          console.warn(`⚠️ [pollOperation] HIGH_TRAFFIC error - will retry polling (attempt ${i + 1}/${maxTries})`);
+          // Don't throw yet, continue polling - it might succeed on next attempt
+          console.log(`⏸️ [pollOperation] Waiting ${intervalMs * 2}ms before retry...`);
+          await sleep(intervalMs * 2); // Double wait time for HIGH_TRAFFIC
+          continue;
+        }
+
+        // For other errors, throw immediately
         console.error(`❌ [pollOperation] FAILED:`, op.error || op);
-        throw new Error(`Generation failed: ${op.error || JSON.stringify(op)}`);
+        throw new Error(`Generation failed: ${errorMsg || JSON.stringify(op)}`);
       }
 
       console.log(`⏸️ [pollOperation] Status: ${op.status} - waiting ${intervalMs}ms before next poll...`);

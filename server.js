@@ -2097,6 +2097,60 @@ app.post('/api/veo3/update-scene', async (req, res) => {
   }
 });
 
+// Get project data (scenes and clips) from Google
+app.post('/api/veo3/get-project', async (req, res) => {
+  try {
+    const { projectId } = req.body;
+
+    if (!projectId) {
+      return res.json({ success: false, error: 'No projectId provided' });
+    }
+
+    log(`Getting project data: ${projectId}`);
+
+    const token = await getAccessToken();
+
+    const response = await axios.post(
+      'https://labs.google/fx/api/trpc/project.get',
+      {
+        json: { projectId, toolName: 'PINHOLE' }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Referer': 'https://labs.google/fx/tools/flow',
+          'Origin': 'https://labs.google'
+        }
+      }
+    );
+
+    const projectData = response.data?.result?.data?.json;
+
+    if (!projectData) {
+      throw new Error('No project data in response');
+    }
+
+    log(`✓ Project data retrieved: ${projectData.scenes?.length || 0} scenes`);
+    res.json({ success: true, project: projectData });
+  } catch (err) {
+    log(`✗ Get project failed: ${err.message}`, 'error');
+
+    // Handle 401 specifically
+    if (err.response?.status === 401) {
+      log('⚠️ Token expired! Please refresh by clicking "Bắt Token" button', 'error');
+      return res.json({
+        success: false,
+        error: 'Token đã hết hạn! Vui lòng click nút "Bắt Token" để làm mới.',
+        tokenExpired: true,
+        statusCode: 401
+      });
+    }
+
+    res.json({ success: false, error: err.message });
+  }
+});
+
 // Spawn CMD process to download videos (like index.js)
 app.post('/api/veo3/spawn-download', async (req, res) => {
   try {
