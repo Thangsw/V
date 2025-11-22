@@ -5638,6 +5638,8 @@
                     try {
                         const opResult = await window.VideoVeo3.pollOperation(op.operation.name, { intervalMs: 3000, maxTries: 100 });
                         console.log(`✅ [Scene ${sceneIdx}] Poll result for op ${opIdx + 1}:`, opResult);
+                        console.log(`🔍 [Scene ${sceneIdx}] opResult structure check - has video?`, !!opResult?.video);
+                        console.log(`🔍 [Scene ${sceneIdx}] opResult.video:`, opResult?.video);
 
                         if (opResult?.video?.url) {
                             results.push({
@@ -5646,13 +5648,21 @@
                                 mediaId: opResult.video.mediaId
                             });
                             console.log(`✅ [Scene ${sceneIdx}] Added video result ${results.length}`);
+                        } else {
+                            console.warn(`⚠️ [Scene ${sceneIdx}] opResult for op ${opIdx + 1} has no video.url!`);
+                            console.warn(`⚠️ [Scene ${sceneIdx}] Full opResult:`, JSON.stringify(opResult, null, 2));
                         }
                     } catch (err) {
                         console.error(`❌ [Scene ${sceneIdx}] Failed to poll operation ${opIdx + 1}:`, err);
+                        console.error(`❌ [Scene ${sceneIdx}] Error details:`, err.message, err.stack);
                     }
                 }
 
+                console.log(`📊 [Scene ${sceneIdx}] Polling complete. Results count: ${results.length}/${operations.length}`);
+
                 if (results.length === 0) {
+                    console.error(`❌ [Scene ${sceneIdx}] ZERO videos generated! Operations count was: ${operations.length}`);
+                    console.error(`❌ [Scene ${sceneIdx}] All operations:`, JSON.stringify(operations, null, 2));
                     throw new Error('No videos were generated successfully');
                 }
 
