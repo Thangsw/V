@@ -1694,69 +1694,7 @@ app.post('/api/veo3/generate-start-end', async (req, res) => {
 });
 
 // Generate video from 1 image (start only)
-app.post('/api/veo3/generate-start-image', async (req, res) => {
-  try {
-    const { projectId, sceneId, startImageMediaId, prompt, aspectRatio, seeds } = req.body;
-
-    log(`Generating start-image video: "${prompt.substring(0, 50)}..."`);
-
-    const token = await getAccessToken();
-
-    // Generate unique IDs for logs
-    const sessionId = generateSessionId();
-    const queryId = `PINHOLE_MAIN_VIDEO_GENERATION_CACHE_ID${cryptoRandomId()}`;
-    const timerId = `VIDEO_CREATION_TO_VIDEO_COMPLETION${cryptoRandomId()}`;
-
-    // Send 3 logs before generation (với aspectRatio)
-    await submitBatchLog(token, 'VIDEOFX_CREATE_VIDEO', 'IMAGE_TO_VIDEO', queryId, aspectRatio);
-    await submitBatchLog(token, 'PINHOLE_GENERATE_VIDEO', 'IMAGE_TO_VIDEO', queryId, aspectRatio);
-    await submitVideoTimerLog(token, timerId);
-
-    const seedsArray = seeds || [Math.floor(Math.random() * 65536), Math.floor(Math.random() * 65536)];
-
-    const response = await axios.post(
-      'https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoStartImage',
-      {
-        clientContext: {
-          sessionId: sessionId,
-          projectId,
-          tool: 'PINHOLE',
-          userPaygateTier: 'PAYGATE_TIER_TWO'
-        },
-        requests: seedsArray.map(seed => ({
-          aspectRatio,
-          seed,
-          textInput: { prompt },
-          videoModelKey: 'veo_3_1_i2v_s_fast',
-          startImage: { mediaId: startImageMediaId },
-          metadata: { sceneId }
-        }))
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'text/plain;charset=UTF-8',
-          'Referer': 'https://labs.google/',
-          'x-browser-channel': 'stable',
-          'x-browser-year': '2025',
-          'x-client-data': 'CIyIywE='
-        }
-      }
-    );
-
-    const operations = response.data.operations.map(op => ({
-      operation: { name: op.operation.name },
-      sceneId: op.sceneId,
-      status: op.status
-    }));
-
-    log(`✓ Start-image video generation started! ${operations.length} variants`);
-    res.json({ success: true, operations });
-  } catch (err) {
-    log(`✗ Generate start-image video failed: ${err.message}`, 'error');
-    res.json({ success: false, error: err.message });
-  }
-});
+// OLD ENDPOINT - REMOVED (duplicate, causes conflicts)
 
 // Generate video from text only (text-to-video)
 app.post('/api/veo3/generate-text', async (req, res) => {
@@ -1816,24 +1754,37 @@ app.post('/api/veo3/generate-start-image', async (req, res) => {
   try {
     const { clientContext, requests } = req.body;
 
-    log(`Generating start-image-to-video: ${requests.length} requests`);
+    if (!clientContext || !requests || !requests.length) {
+      return res.json({ success: false, error: 'Missing clientContext or requests' });
+    }
+
+    // Extract info from first request for logging
+    const firstRequest = requests[0];
+    const prompt = firstRequest.textInput?.prompt || '';
+    const aspectRatio = firstRequest.aspectRatio || 'VIDEO_ASPECT_RATIO_LANDSCAPE';
+
+    log(`Generating start-image video: "${prompt.substring(0, 50)}..." (${requests.length} variants)`);
 
     const token = await getAccessToken();
 
+    // Generate unique IDs for logs
+    const queryId = `PINHOLE_MAIN_VIDEO_GENERATION_CACHE_ID${cryptoRandomId()}`;
+    const timerId = `VIDEO_CREATION_TO_VIDEO_COMPLETION${cryptoRandomId()}`;
+
+    // Send batch logs before generation
+    await submitBatchLog(token, 'VIDEOFX_CREATE_VIDEO', 'IMAGE_TO_VIDEO', queryId, aspectRatio);
+    await submitBatchLog(token, 'PINHOLE_GENERATE_VIDEO', 'IMAGE_TO_VIDEO', queryId, aspectRatio);
+    await submitVideoTimerLog(token, timerId);
+
     // Ensure sessionId in clientContext
     const sessionId = generateSessionId();
-    const finalClientContext = clientContext ? {
+    const finalClientContext = {
       ...clientContext,
       sessionId: clientContext.sessionId || sessionId
-    } : {
-      sessionId: sessionId,
-      projectId: veo3Session.projectId,
-      tool: 'PINHOLE',
-      userPaygateTier: 'PAYGATE_TIER_TWO'
     };
 
     const response = await axios.post(
-      'https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoText',
+      'https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoStartImage',
       {
         clientContext: finalClientContext,
         requests
